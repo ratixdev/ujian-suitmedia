@@ -1,0 +1,89 @@
+image: ujian-suitmedia/docker-builder:latest
+
+variables:
+
+  dockerTag: '$CI_BUILD_REF'
+
+  DOCKER_REPO: ujian-suitmedia
+
+  IMAGE_BASE_NAME: test1
+
+  IMAGE: $EVISTA_DOCKER_REPO/$IMAGE_BASE_NAME:$CI_BUILD_REF
+
+  CONTAINER_NAME: 'test-pipeline'
+
+  TARGET_DIR_STAGE: /srv/docker/staging/test1
+
+  TARGET_DIR_PROD: /srv/docker/prod/test1
+
+before_script:
+
+- echo $dockerTag
+
+- echo $DOCKER_CERT > cert.ca
+
+- eval $(ssh-agent -s)
+
+- ssh-add <(echo "$ID_RSA")
+
+- mkdir -p ~/.ssh
+
+- '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+
+build:
+
+  type: build
+
+  tags:
+
+  - docker-in-docker-pure-builder
+
+  script:
+
+  # build test images
+
+  - docker build -t $IMAGE .
+
+  only:
+
+  - production
+
+deployToAWS:
+
+  type: deploy
+
+  variables:
+
+    RELEASE_IMAGE: $DOCKER_REPO/$IMAGE_BASE_NAME:stable
+
+    DOCKER_COMPOSE_CMD: cd $TARGET_DIR_PROD && docker-compose 
+
+  tags:
+
+    - docker-in-docker-builder
+
+  script:
+
+  # tag the final image (the previous test image is built upon the test image file)
+
+  - docker tag $IMAGE $IMAGE
+
+  - docker --tlscacert cert.ca push $IMAGE
+
+  # tag the full image as lastest and push it
+
+  - docker tag $IMAGE $RELEASE_IMAGE
+
+  - docker --tlscacert cert.ca push $RELEASE_IMAGE
+
+  # deploy the images
+
+  - ssh user@someserver.com -p2224 "docker pull $RELEASE_IMAGE"
+
+  - ssh user@someserver.com -p2224 "${DOCKER_COMPOSE_CMD} stop"
+
+  - ssh user@someserver.com -p2224 "${DOCKER_COMPOSE_CMD} up -d"
+
+  only:
+
+  - production
