@@ -1,9 +1,14 @@
-const express = require('express') // Import express npm
+const http = require('http');
 
-const app = express() // instantiate an express app
+const hostname = '127.0.0.1';
+const port = 3000;
 
-const port = 3000 // Specify the port on which the HTTP call will listen
+const server = http.createServer((req, res) => {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain');
+  res.end('Hello Suitmedia, I am Ferry Ananda Febian');
+});
 
-app.get('/', (req, res, next) => res.send({status: 200, data: 'Hey, how are you?'})) // Define a route
-
-app.listen(port, () => console.log(`Example app listening on port ${port}`))
+server.listen(port, hostname, () => {
+  console.log(`Server running at http://${hostname}:${port}/`);
+});
